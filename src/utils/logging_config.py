@@ -1,137 +1,71 @@
 """
 Logging configuration for the payload obfuscator.
-
-This module provides a centralized configuration for logging using loguru and rich.
-It ensures consistent formatting and proper log level handling across the application.
 """
 
 import os
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Any
 from loguru import logger
 from rich.console import Console
-from rich.logging import RichHandler
-from rich.theme import Theme
 
-# Define log levels and their rich formatting
-LOG_LEVELS = {
-    "TRACE": {"color": "dim blue", "icon": "🔍"},
-    "DEBUG": {"color": "blue", "icon": "🐛"},
-    "INFO": {"color": "cyan", "icon": "ℹ️"},
-    "SUCCESS": {"color": "green", "icon": "✅"},
-    "WARNING": {"color": "yellow", "icon": "⚠️"},
-    "ERROR": {"color": "red", "icon": "❌"},
-    "CRITICAL": {"color": "bold red", "icon": "💀"}
-}
-
-def setup_logging(console: Console, log_dir: str, context: Optional[dict] = None) -> None:
+def setup_logging(console: Console, output_dir: str, context: Dict[str, Any]) -> None:
     """
-    Configure logging with both console and file handlers.
+    Configure logging with file and console outputs.
     
     Args:
-        console: Rich console instance for output
-        log_dir: Directory for log files
-        context: Optional dictionary of context variables for logging
+        console: Rich console instance for formatted output
+        output_dir: Directory for log files
+        context: Additional context for log records
     """
     try:
-        # Remove any existing handlers
+        # Create logs directory
+        log_dir = Path(output_dir) / "logs"
+        os.makedirs(log_dir, exist_ok=True)
+        
+        # Log file path
+        log_file = log_dir / f"obfuscator_{context.get('session_id', 'unknown')}.log"
+        
+        # Remove default handler
         logger.remove()
         
-        # Ensure log directory exists
-        log_dir = Path(log_dir) / "logs"
-        log_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Configure console logging with rich
-        console_format = (
-            "<level>{level.icon}</level> "
-            "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
-            "<level>{level: <8}</level> | "
-            "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
-            "<level>{message}</level>"
-        )
-        
-        # Add rich handler for console output
-        logger.add(
-            RichHandler(
-                console=console,
-                show_path=False,
-                enable_link_path=True,
-                markup=True,
-                rich_tracebacks=True,
-                tracebacks_show_locals=True,
-                tracebacks_theme="monokai",
-                log_time_format="[%X]",
-                omit_repeated_times=False,
-                show_level=True
-            ),
-            format=console_format,
-            level="INFO",
-            enqueue=True,
-            backtrace=True,
-            diagnose=True,
-            catch=True
-        )
-        
-        # Configure detailed file logging
-        file_format = (
-            "{time:YYYY-MM-DD HH:mm:ss.SSS} | "
-            "{level: <8} | "
-            "process:{process}:{thread} | "
-            "{name}:{function}:{line} | "
-            "{message}"
-        )
-        
-        # Add rotating file handler
-        log_file = log_dir / "obfuscator.log"
+        # Add file handler with plain formatting
         logger.add(
             str(log_file),
-            format=file_format,
             level="DEBUG",
-            rotation="100 MB",
+            format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {message}",
+            rotation="1 day",
             retention="1 week",
-            compression="zip",
-            enqueue=True,
-            backtrace=True,
-            diagnose=True,
-            catch=True,
-            serialize=True  # JSON format for better parsing
+            compression="zip"
         )
         
-        # Add error-specific log file
-        error_log = log_dir / "errors.log"
+        # Add console handler with rich formatting
+        def console_formatter(record):
+            level_colors = {
+                "DEBUG": "blue",
+                "INFO": "cyan",
+                "SUCCESS": "green",
+                "WARNING": "yellow",
+                "ERROR": "red",
+                "CRITICAL": "bold red"
+            }
+            color = level_colors.get(record["level"].name, "white")
+            return f"[{color}]{record['message']}[/{color}]"
+            
         logger.add(
-            str(error_log),
-            format=file_format,
-            level="ERROR",
-            rotation="100 MB",
-            retention="1 month",
-            compression="zip",
-            enqueue=True,
-            backtrace=True,
-            diagnose=True,
-            catch=True,
-            serialize=True
+            lambda msg: console.print(msg),
+            level="INFO",
+            format=console_formatter
         )
         
-        # Configure log levels with custom formatting
-        for level, settings in LOG_LEVELS.items():
-            logger.level(level, color=f"<{settings['color']}>")
-            setattr(logger.level(level), "icon", settings["icon"])
+        # Add context to all future logs
+        logger.configure(extra=context)
         
-        # Add context if provided
-        if context:
-            logger.configure(extra=context)
-        
-        # Log initial messages
-        logger.info("Logging system initialized")
-        logger.debug(f"Log directory: {log_dir}")
-        if context:
-            logger.debug(f"Logging context: {context}")
+        logger.debug("Logging configured successfully", context=context)
         
     except Exception as e:
-        print(f"Error setting up logging: {str(e)}", file=sys.stderr)
-        sys.exit(1)
+        print(f"Failed to setup logging: {str(e)}", file=sys.stderr)
+        raise
 
 
 def get_logger():

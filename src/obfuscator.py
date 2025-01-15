@@ -90,7 +90,9 @@ class PayloadObfuscator:
         Returns:
             bool: True if successful, False otherwise
         """
-        if not self.pe_handler.validate_pe(self.input_file):
+        # Validate PE file first
+        if not self.validation_handler.validate_pe(self.input_file):
+            logger.error("[red]Invalid PE file[/red]")
             return False
             
         try:
@@ -171,7 +173,7 @@ def main():
     
     parser = argparse.ArgumentParser(
         description="Windows Binary Payload Obfuscator (OSEP Study Tool)",
-        epilog="Example: python -m payload_obfuscator.src.obfuscator input.exe -o output_dir"
+        epilog="Example: python -m src.obfuscator input.exe -o output_dir"
     )
     parser.add_argument(
         "input_file",
@@ -180,12 +182,13 @@ def main():
     parser.add_argument(
         "-o", "--output-dir",
         help="Output directory (default: input_file_dir/output)",
-        default=None
+        default=None,
+        dest="output_dir"
     )
     
-    args = parser.parse_args()
-    
     try:
+        args = parser.parse_args()
+        
         # Convert paths to absolute paths
         input_file = str(Path(args.input_file).resolve())
         output_dir = str(Path(args.output_dir).resolve()) if args.output_dir else None
@@ -197,7 +200,7 @@ def main():
         sys.exit(0 if success else 1)
         
     except Exception as e:
-        print(f"Error: {str(e)}", file=sys.stderr)
+        logger.error(f"Error: {str(e)}")
         sys.exit(1)
 
 
