@@ -1,6 +1,6 @@
 # Payload Obfuscator
 
-A Python-based tool for studying and practicing Windows PE binary obfuscation techniques in the context of the OSEP (PEN-300) exam preparation. This tool is designed for educational purposes and should only be used in authorized lab environments.
+A Python-based tool for studying and practicing Windows PE binary obfuscation techniques. This tool is designed for educational purposes and should only be used in authorized lab environments.
 
 ## Features
 
