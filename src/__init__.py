@@ -15,4 +15,4 @@ from .handlers.base_handler import HandlerError
 __all__ = [
     'PayloadObfuscator',
     'HandlerError'
-] 
+]

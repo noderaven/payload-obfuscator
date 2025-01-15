@@ -1,1 +1,58 @@
+# Python artifacts
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Binary files
+*.exe
+*.dll
+*.sys
+*.bin
+*.obj
+*.o
+*.lib
+*.pdb
+*.exp
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+.project
+.pydevproject
+.settings/
+
+# Logs and databases
+*.log
+*.sqlite
+logs/
+output/
+
+# Test files and directories
+test_files/
+samples/
+temp/
+tmp/
