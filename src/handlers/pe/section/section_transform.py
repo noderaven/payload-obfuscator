@@ -15,9 +15,9 @@ import random
 from dataclasses import dataclass
 from typing import Dict, Optional, Set
 import pefile
-from Crypto.Cipher import AES
-from Crypto.Random import get_random_bytes
-from Crypto.Util.Padding import pad, unpad
+from Cryptodome.Cipher import AES
+from Cryptodome.Random import get_random_bytes
+from Cryptodome.Util.Padding import pad, unpad
 from loguru import logger
 
 from .errors import TransformError

@@ -15,7 +15,7 @@ setup(
         "pefile>=2023.2.7",
         "rich>=13.3.1",
         "loguru>=0.7.0",
-        "pycryptodome>=3.19.0",
+        "pycryptodomex>=3.19.0",
         "psutil>=5.9.5",
         "wmi>=1.5.1",
         "netifaces>=0.11.0"
