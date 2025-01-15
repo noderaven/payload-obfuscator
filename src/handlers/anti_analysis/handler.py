@@ -1,123 +1,102 @@
 """
-Main handler for anti-analysis features.
+Anti-analysis handler module.
 
-This module orchestrates all anti-analysis capabilities including:
-- Debugger detection and evasion
-- Virtualization detection
+This module coordinates various anti-analysis techniques:
+- Debugger detection
+- VM/sandbox detection
 - Timing checks
 - Integrity verification
 """
 
-from typing import Dict, Any, Optional
+import platform
+from typing import Dict, Optional
 from loguru import logger
 
+from ..base_handler import BaseHandler
 from .debugger_checks import DebuggerDetector
 from .vm_checks import VirtualizationDetector
-from ...base_handler import BaseHandler
+from .timing_checks import TimingChecker
+from .integrity_checks import IntegrityChecker
 
 class AntiAnalysisHandler(BaseHandler):
-    """
-    Main handler for anti-analysis features.
-    
-    This class orchestrates all anti-analysis operations and provides
-    a unified interface for the obfuscator.
-    """
+    """Coordinates anti-analysis techniques."""
     
     def __init__(self):
         """Initialize anti-analysis components."""
         super().__init__()
         self.debugger_detector = DebuggerDetector()
         self.vm_detector = VirtualizationDetector()
+        self.timing_checker = TimingChecker()
+        self.integrity_checker = IntegrityChecker()
         
     def check_environment(self) -> Dict[str, bool]:
         """
-        Perform comprehensive environment analysis.
+        Check execution environment for analysis tools.
         
         Returns:
-            Dict containing detection results for each category
+            Dict[str, bool]: Results of various checks
         """
-        try:
-            results = {
-                "debugger_detected": False,
-                "virtualization_detected": False,
-                "timing_anomalies": False
-            }
-            
-            # Check for debuggers
-            if self.debugger_detector.is_being_debugged():
-                results["debugger_detected"] = True
-                logger.warning("Debugger detected")
-                
-            # Check for virtualization
-            if self.vm_detector.is_virtualized():
-                results["virtualization_detected"] = True
-                logger.warning("Virtualization detected")
-                
-            return results
-            
-        except Exception as e:
-            logger.error(f"Environment check failed: {str(e)}")
-            return results
-            
-    def apply_evasion_techniques(self, 
-                               skip_debugger: bool = False,
-                               skip_vm: bool = False) -> bool:
-        """
-        Apply all evasion techniques.
+        results = {}
         
-        Args:
-            skip_debugger: Skip debugger evasion
-            skip_vm: Skip VM evasion
+        # Debugger checks
+        debug_results = self.debugger_detector.check_debugger()
+        results.update(debug_results)
+        
+        # VM checks
+        vm_results = self.vm_detector.check_virtualization()
+        results.update(vm_results)
+        
+        # Timing checks
+        timing_results = self.timing_checker.check_timing_anomalies()
+        results.update(timing_results)
+        
+        # Integrity checks
+        integrity_results = self.integrity_checker.check_integrity()
+        results.update(integrity_results)
+        
+        if any(results.values()):
+            self.logger.warning(
+                "Analysis environment detected",
+                details={k: v for k, v in results.items() if v}
+            )
             
+        return results
+        
+    def apply_evasion_techniques(self) -> bool:
+        """
+        Apply various evasion techniques.
+        
         Returns:
-            bool: True if all selected techniques applied successfully
+            bool: True if successful
         """
         try:
-            success = True
+            # Apply anti-debug measures
+            self.debugger_detector.apply_anti_debug()
             
-            if not skip_debugger:
-                try:
-                    self.debugger_detector.apply_anti_debug_techniques()
-                except Exception as e:
-                    logger.error(f"Debugger evasion failed: {str(e)}")
-                    success = False
-                    
-            if not skip_vm:
-                try:
-                    self.vm_detector.apply_vm_evasion()
-                except Exception as e:
-                    logger.error(f"VM evasion failed: {str(e)}")
-                    success = False
-                    
-            return success
+            # Establish timing baseline
+            self.timing_checker.establish_baseline()
+            
+            return True
             
         except Exception as e:
-            logger.error(f"Evasion application failed: {str(e)}")
+            self.logger.error(f"Error applying evasion techniques: {str(e)}")
             return False
             
-    def get_environment_info(self) -> Dict[str, Any]:
+    def get_environment_info(self) -> Dict[str, str]:
         """
-        Get detailed information about the execution environment.
+        Get detailed information about execution environment.
         
         Returns:
-            Dict containing environment details
+            Dict[str, str]: Environment details
         """
-        try:
-            import platform
-            import psutil
-            
-            info = {
-                "platform": platform.platform(),
-                "processor": platform.processor(),
-                "python_version": platform.python_version(),
-                "memory": psutil.virtual_memory()._asdict(),
-                "cpu_count": psutil.cpu_count(),
-                "network": len(psutil.net_if_addrs()),
-                "analysis_indicators": self.check_environment()
-            }
-            
-            return info
-            
-        except Exception as e:
-            logger.error(f"Failed to get environment info: {str(e)}")
-            return {} 
+        info = {
+            "platform": platform.system(),
+            "python_version": platform.python_version(),
+            "architecture": platform.machine()
+        }
+        
+        # Add VM info if available
+        vm_info = self.vm_detector.get_vm_info()
+        info.update(vm_info)
+        
+        return info 

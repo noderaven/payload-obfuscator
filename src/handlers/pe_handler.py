@@ -132,7 +132,7 @@ from loguru import logger
 from .base_handler import BaseHandler, HandlerError
 from .pe.validation_handler import ValidationHandler, ValidationError
 from .pe.checksum_handler import ChecksumHandler, ChecksumError
-from .pe.section_handler import SectionHandler, SectionError
+from .pe.section.section_handler import SectionHandler, SectionError
 from .pe.import_handler import ImportHandler, ImportError
 
 class PEHandlerError(HandlerError):

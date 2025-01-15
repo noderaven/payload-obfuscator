@@ -26,8 +26,8 @@ from loguru import logger
 from rich.console import Console
 from rich.theme import Theme
 from src.handlers.pe_handler import PEHandler
-from src.handlers.section_handler import SectionHandler
-from src.handlers.verification_handler import VerificationHandler
+from src.handlers.pe.section.section_handler import SectionHandler
+from src.handlers.pe.validation_handler import ValidationHandler
 from src.utils.logging_config import setup_logging
 from src.handlers.anti_analysis.handler import AntiAnalysisHandler
 
@@ -61,7 +61,7 @@ class PayloadObfuscator:
         # Initialize handlers
         self.pe_handler = PEHandler()
         self.section_handler = SectionHandler()
-        self.verification_handler = VerificationHandler()
+        self.validation_handler = ValidationHandler()
         self.anti_analysis_handler = AntiAnalysisHandler()
         
         # Setup logging with context
@@ -153,7 +153,7 @@ class PayloadObfuscator:
             
             # Save and verify
             if self.pe_handler.save_pe(pe, output_path):
-                if self.verification_handler.verify_obfuscation(pe, output_path):
+                if self.validation_handler.verify_obfuscation(pe, output_path):
                     return True
                 else:
                     logger.error("[red]Obfuscated file verification failed[/red]")
