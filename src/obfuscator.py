@@ -29,6 +29,7 @@ from src.handlers.pe_handler import PEHandler
 from src.handlers.section_handler import SectionHandler
 from src.handlers.verification_handler import VerificationHandler
 from src.utils.logging_config import setup_logging
+from src.handlers.anti_analysis.handler import AntiAnalysisHandler
 
 class PayloadObfuscator:
     """Main class for obfuscating Windows binary payloads."""
@@ -61,6 +62,7 @@ class PayloadObfuscator:
         self.pe_handler = PEHandler()
         self.section_handler = SectionHandler()
         self.verification_handler = VerificationHandler()
+        self.anti_analysis_handler = AntiAnalysisHandler()
         
         # Setup logging with context
         self._setup_logging()
@@ -92,11 +94,21 @@ class PayloadObfuscator:
             return False
             
         try:
+            # Check execution environment
+            env_check = self.anti_analysis_handler.check_environment()
+            if any(env_check.values()):
+                logger.warning("Analysis environment detected", details=env_check)
+                
             pe = self.pe_handler.load_pe(self.input_file)
             if not pe:
                 return False
             
             with self.console.status("[bold yellow]Obfuscating payload...") as status:
+                # Apply anti-analysis techniques
+                status.update("[yellow]Applying anti-analysis techniques...[/yellow]")
+                if not self.anti_analysis_handler.apply_evasion_techniques():
+                    logger.warning("Some evasion techniques failed")
+                
                 steps = [
                     ("Processing sections", lambda: self.section_handler.process_sections(pe)),
                     ("Adding API resolver", lambda: self.pe_handler.add_api_resolver(pe)),
@@ -110,6 +122,10 @@ class PayloadObfuscator:
                         logger.error(f"[red]Failed:[/red] {step_name}")
                         return False
                     logger.success(f"[green]Completed:[/green] {step_name}")
+            
+            # Log environment info
+            env_info = self.anti_analysis_handler.get_environment_info()
+            logger.debug("Environment information", details=env_info)
             
             logger.success("[green]✓ Payload obfuscation completed successfully[/green]")
             return True
