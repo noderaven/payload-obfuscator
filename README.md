@@ -16,6 +16,23 @@ A Python-based tool for studying and practicing Windows PE binary obfuscation te
 - Length-preserving mutations
 - PE format compatibility validation
 
+### String Obfuscation
+- Multiple encryption algorithms (XOR, AES, RC4, custom)
+- Dynamic key generation
+- String detection and encryption
+- Runtime decryption support
+- Resource string manipulation
+- String table modification
+
+### Anti-Analysis Features
+- Debugger detection and evasion
+- Virtualization detection
+- Process environment checks
+- Hardware breakpoint detection
+- API hooking detection
+- Timing-based checks
+- Parent process verification
+
 ### Content Transformation
 - Section content encryption
 - Base64 encoding
@@ -36,7 +53,7 @@ git clone https://github.com/rileymxyz/payload_obfuscator.git
 cd payload_obfuscator
 
 # Create and activate virtual environment (recommended)
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
@@ -65,7 +82,7 @@ python3 -m payload_obfuscator.src.obfuscator input.exe -o output_dir
 
 ## Advanced Usage Examples
 
-### Section Name Randomization
+### String Encryption
 
 ```python
 from payload_obfuscator.src.obfuscator import PayloadObfuscator
@@ -73,31 +90,41 @@ from payload_obfuscator.src.obfuscator import PayloadObfuscator
 obfuscator = PayloadObfuscator("input.exe", "output_dir")
 pe = obfuscator.pe_handler.load_pe("input.exe")
 
+# Encrypt strings using specific method
+obfuscator.string_handler.encrypt_strings(pe, method="aes")
+
+# Encrypt strings in specific sections
+obfuscator.string_handler.encrypt_strings(pe, method="xor", section_names=[".text", ".data"])
+
+# Get string table information
+info = obfuscator.string_handler.get_string_table_info(pe)
+```
+
+### Anti-Analysis Features
+
+```python
+# Check execution environment
+env_check = obfuscator.anti_analysis_handler.check_environment()
+
+# Apply evasion techniques
+obfuscator.anti_analysis_handler.apply_evasion_techniques(
+    skip_debugger=False,
+    skip_vm=False
+)
+
+# Get detailed environment info
+env_info = obfuscator.anti_analysis_handler.get_environment_info()
+```
+
+### Section Name Randomization
+
+```python
 # Randomize specific section
 section = pe.sections[0]
 obfuscator.section_handler.randomize_section_name(pe, section, strategy="random")
 
 # Randomize all non-critical sections
 obfuscator.section_handler.randomize_all_section_names(pe, skip_critical=True, strategy="mimic")
-```
-
-### Section Splitting
-
-```python
-# Split a large section into smaller ones
-section = pe.sections[0]
-split_sections = obfuscator.section_handler.split_section(pe, section, split_size=4096)
-```
-
-### Content Transformation
-
-```python
-# Apply encryption to a section
-section = pe.sections[0]
-obfuscator.section_handler.transform_section_content(pe, section, "encrypt")
-
-# Apply polymorphic changes
-snapshot = obfuscator.section_handler.apply_polymorphic_characteristics(pe, section)
 ```
 
 ## Security Considerations
@@ -116,16 +143,11 @@ snapshot = obfuscator.section_handler.apply_polymorphic_characteristics(pe, sect
 4. Push to the branch
 5. Create a Pull Request
 
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
 ## Disclaimer
 
-This tool is intended for educational purposes only, specifically for practicing techniques covered in the OSEP exam within authorized lab environments. The authors are not responsible for any misuse or damage caused by this tool.
+This tool is intended for educational purposes only, specifically for practicing techniques within authorized lab environments. The authors are not responsible for any misuse or damage caused by this tool.
 
 ## Acknowledgments
 
-- OSEP (PEN-300) course material
 - PE format documentation
 - Python pefile library
