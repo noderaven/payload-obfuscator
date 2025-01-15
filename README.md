@@ -47,18 +47,49 @@ A Python-based tool for studying and practicing Windows PE binary obfuscation te
 
 ## Installation
 
+### Regular Installation
 ```bash
 # Clone the repository
-git clone https://github.com/rileymxyz/payload_obfuscator.git
+git clone https://github.com/yourusername/payload_obfuscator.git
 cd payload_obfuscator
 
 # Create and activate virtual environment (recommended)
-python3 -m venv venv
+python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install dependencies
-pip install -r requirements.txt
+# Install package
+pip install .
 ```
+
+### Development Setup
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/payload_obfuscator.git
+cd payload_obfuscator
+
+# Create and activate virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install in development mode
+pip install -e .
+
+# Install development dependencies
+pip install -r requirements-dev.txt  # if you have additional dev requirements
+```
+
+### Troubleshooting
+
+If you encounter import errors:
+1. Make sure you've installed the package (`pip install .` or `pip install -e .`)
+2. Verify your Python environment is activated
+3. Check that all dependencies are installed
+4. If using from source directory, make sure you're in the correct directory
+
+Common issues:
+- ModuleNotFoundError: Make sure the package is installed
+- ImportError: Check that all dependencies are installed
+- PermissionError: Use appropriate permissions/sudo when needed
 
 ## Usage
 
