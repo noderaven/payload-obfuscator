@@ -99,3 +99,26 @@ DEFAULT_COMPRESSION_LEVEL: int = 9
 # Encryption constants
 AES_BLOCK_SIZE: int = 16
 AES_KEY_SIZE: int = 32  # 256-bit key 
+
+# Section Name Constants
+MAX_SECTION_NAME_LENGTH = 8
+
+# Common PE Section Names
+COMMON_SECTION_NAMES = [
+    ".text",
+    ".data",
+    ".rdata",
+    ".idata",
+    ".edata",
+    ".pdata",
+    ".rsrc",
+    ".reloc",
+    ".bss",
+    ".tls",
+    ".debug",
+    "CODE",
+    "DATA",
+    "BSS",
+    "PAGE",
+    "INIT"
+] 

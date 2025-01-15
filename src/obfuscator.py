@@ -11,7 +11,7 @@ Usage:
         obfuscator.obfuscate()
         
     From command line:
-        python -m payload_obfuscator.src.obfuscator input.exe [output_dir]
+        python3 -m payload_obfuscator.src.obfuscator input.exe [output_dir]
 
 Note:
     This tool is intended for educational purposes only, specifically for practicing
@@ -25,19 +25,10 @@ from typing import Optional
 from loguru import logger
 from rich.console import Console
 from rich.theme import Theme
-
-try:
-    # When running as a package
-    from payload_obfuscator.src.handlers.pe_handler import PEHandler
-    from payload_obfuscator.src.handlers.section_handler import SectionHandler
-    from payload_obfuscator.src.handlers.verification_handler import VerificationHandler
-    from payload_obfuscator.src.utils.logging_config import setup_logging
-except ImportError:
-    # When running directly
-    from handlers.pe_handler import PEHandler
-    from handlers.section_handler import SectionHandler
-    from handlers.verification_handler import VerificationHandler
-    from utils.logging_config import setup_logging
+from src.handlers.pe_handler import PEHandler
+from src.handlers.section_handler import SectionHandler
+from src.handlers.verification_handler import VerificationHandler
+from src.utils.logging_config import setup_logging
 
 class PayloadObfuscator:
     """Main class for obfuscating Windows binary payloads."""

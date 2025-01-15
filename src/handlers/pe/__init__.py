@@ -8,7 +8,6 @@ This module provides functionality for PE file manipulation:
 - Checksum handling
 """
 
-from .pe_handler import PEHandler
 from .section.section_handler import SectionHandler
 from .section.errors import SectionError
 from .import_handler import ImportHandler

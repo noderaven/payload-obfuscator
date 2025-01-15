@@ -17,6 +17,7 @@ from .section_transform import SectionTransformer, CharacteristicsSnapshot
 from .section_operations import SectionOperator
 from .helpers import validate_section_name
 from ...base_handler import BaseHandler
+from .name_generator import NameGenerator
 
 class SectionHandler(BaseHandler):
     """
@@ -47,6 +48,7 @@ class SectionHandler(BaseHandler):
         super().__init__()
         self.operator = SectionOperator()
         self.transformer = SectionTransformer()
+        self.name_generator = NameGenerator()
     
     def find_suitable_section(
         self,
@@ -168,3 +170,72 @@ class SectionHandler(BaseHandler):
                 error=e
             )
             return None 
+    
+    def randomize_section_name(self, pe: pefile.PE, section: pefile.SectionStructure,
+                             strategy: str = "random") -> bool:
+        """
+        Randomize the name of a PE section.
+        
+        Args:
+            pe: PE file object
+            section: Section to rename
+            strategy: Naming strategy ("random", "mimic", or "mutate")
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            # Generate new name based on strategy
+            if strategy == "mimic":
+                new_name = self.name_generator.mimic_common_name()
+            elif strategy == "mutate":
+                current_name = section.Name.decode().rstrip('\x00')
+                new_name = self.name_generator.mutate_name(current_name)
+            else:  # random
+                new_name = self.name_generator.generate_random_name()
+                
+            # Validate the generated name
+            if not self.name_generator.is_valid_name(new_name):
+                logger.error(f"Generated name '{new_name}' is invalid")
+                return False
+                
+            # Update section name
+            return self.operator.rename_section(pe, section, new_name)
+            
+        except Exception as e:
+            logger.error(f"Failed to randomize section name: {str(e)}")
+            return False
+            
+    def randomize_all_section_names(self, pe: pefile.PE, 
+                                  skip_critical: bool = True,
+                                  strategy: str = "random") -> bool:
+        """
+        Randomize names of all suitable sections in the PE file.
+        
+        Args:
+            pe: PE file object
+            skip_critical: Whether to skip critical sections
+            strategy: Naming strategy ("random", "mimic", or "mutate")
+            
+        Returns:
+            bool: True if all operations successful, False otherwise
+        """
+        try:
+            success = True
+            for section in pe.sections:
+                # Skip critical sections if requested
+                if skip_critical:
+                    current_name = section.Name.decode().rstrip('\x00')
+                    if current_name in CRITICAL_SECTIONS:
+                        logger.info(f"Skipping critical section: {current_name}")
+                        continue
+                        
+                # Randomize section name
+                if not self.randomize_section_name(pe, section, strategy):
+                    success = False
+                    
+            return success
+            
+        except Exception as e:
+            logger.error(f"Failed to randomize section names: {str(e)}")
+            return False 

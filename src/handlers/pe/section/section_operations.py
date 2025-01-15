@@ -639,4 +639,39 @@ class SectionOperator:
                 },
                 cause=e,
                 remediation="Verify sections exist and can be merged"
-            ) 
+            )
+    
+    def rename_section(self, pe: pefile.PE, section: pefile.SectionStructure, 
+                      new_name: str) -> bool:
+        """
+        Rename a PE section.
+        
+        Args:
+            pe: PE file object
+            section: Section to rename
+            new_name: New name for the section
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            # Validate new name
+            if not validate_section_name(new_name):
+                logger.error(f"Invalid section name: {new_name}")
+                return False
+                
+            # Pad name to 8 bytes as required by PE format
+            padded_name = new_name.ljust(8, '\x00').encode()
+            
+            # Update section name
+            section.Name = padded_name
+            
+            # Force PE to recompute section information
+            pe.full_load()
+            
+            logger.success(f"Successfully renamed section to: {new_name}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to rename section: {str(e)}")
+            return False 
