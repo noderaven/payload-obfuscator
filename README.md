@@ -50,7 +50,7 @@ A Python-based tool for studying and practicing Windows PE binary obfuscation te
 ### Regular Installation
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/payload_obfuscator.git
+git clone https://github.com/rileymxyz/payload_obfuscator.git
 cd payload_obfuscator
 
 # Create and activate virtual environment (recommended)
@@ -64,7 +64,7 @@ pip install .
 ### Development Setup
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/payload_obfuscator.git
+git clone https://github.com/rileymxyz/payload_obfuscator.git
 cd payload_obfuscator
 
 # Create and activate virtual environment

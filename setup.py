@@ -8,8 +8,8 @@ setup(
     name="payload_obfuscator",
     version="1.0.0",
     description="Windows PE binary obfuscation tool for OSEP exam preparation",
-    author="Your Name",
-    author_email="your.email@example.com",
+    author="rileymxyz",
+    author_email="noderaven@proton.me",
     packages=find_packages(),
     install_requires=[
         "pefile>=2023.2.7",
