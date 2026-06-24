@@ -1,11 +1,5 @@
-#!/usr/bin/env python3
-
-"""
-Command-line entry point for the payload obfuscator.
-"""
-
-import sys
-from .src.obfuscator import main
+def main():
+    print("payload-obfuscator v2 -- not yet implemented")
 
 if __name__ == "__main__":
-    sys.exit(main()) 
+    main()

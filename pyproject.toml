@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "payload-obfuscator"
+version = "2.0.0"
+requires-python = ">=3.10"
+dependencies = [
+    "pefile>=2023.2.7",
+    "capstone>=5.0",
+    "pycryptodomex>=3.19.0",
+    "loguru>=0.7.2",
+    "rich>=13.6.0",
+]
+
+[project.scripts]
+payload-obfuscator = "src.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
