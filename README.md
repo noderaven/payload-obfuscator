@@ -1,184 +1,57 @@
-# Payload Obfuscator
+# payload-obfuscator
 
-A Python-based tool for studying and practicing Windows PE binary obfuscation techniques. This tool is designed for educational purposes and should only be used in authorized lab environments.
+A Python tool that applies static evasion techniques to Windows PE64 binaries. Built for OSEP (PEN-300) study and Windows 11 / EDR static-detection research. For authorized lab use only.
 
-## Features
+## Status: Phase 1 (static evasion)
 
-### PE Section Manipulation
-- Section creation and modification
-- Section splitting and merging
-- Space validation and alignment
-- Section table updates
+Phase 1 produces a structurally valid, signature-poor PE that defeats common static heuristics. The injected XOR string decryptor and PEB-walk API resolver stubs are written into the binary but are not yet invoked at load time, so the output binaries are not runtime-functional. TLS callback wiring is Phase 2.
 
-### Section Name Obfuscation
-- Random name generation
-- Common section name mimicry
-- Length-preserving mutations
-- PE format compatibility validation
+## Techniques
 
-### String Obfuscation
-- Multiple encryption algorithms (XOR, AES, RC4, custom)
-- Dynamic key generation
-- String detection and encryption
-- Runtime decryption support
-- Resource string manipulation
-- String table modification
+Applied in this order via `ObfuscationPipeline`:
 
-### Anti-Analysis Features
-- Debugger detection and evasion
-- Virtualization detection
-- Process environment checks
-- Hardware breakpoint detection
-- API hooking detection
-- Timing-based checks
-- Parent process verification
+1. `header_normalize` - zero TimeDateStamp, strip Rich header, wipe debug directory
+2. `string_encrypt` - XOR-encrypt printable ASCII strings in `.rdata`/`.data`; inject decryptor stub and table
+3. `import_hash` - overwrite high-risk import names (VirtualAlloc, CreateThread, etc.) with benign decoys; inject ROR-13 PEB-walk resolver stub
+4. `section_rename` - rename sections to plausible MSVC names; preserve critical sections (`.rsrc`, `.reloc`, `.tls`)
+5. `entropy_reduce` - fill section slack with low-entropy patterns to defeat packer heuristics
+6. `junk_sections` - append a low-entropy decoy section
 
-### Content Transformation
-- Section content encryption
-- Base64 encoding
-- Compression
-- Polymorphic characteristics
+## Install
 
-### Safety Features
-- Critical section protection
-- PE format validation
-- Alignment verification
-- Comprehensive error handling
-
-## Installation
-
-### Regular Installation
 ```bash
-# Clone the repository
-git clone https://github.com/rileymxyz/payload_obfuscator.git
-cd payload_obfuscator
-
-# Create and activate virtual environment (recommended)
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install package
-pip install .
+git clone https://github.com/noderaven/payload-obfuscator.git
+cd payload-obfuscator
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-### Development Setup
-```bash
-# Clone the repository
-git clone https://github.com/rileymxyz/payload_obfuscator.git
-cd payload_obfuscator
-
-# Create and activate virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install in development mode
-pip install -e .
-
-# Install development dependencies
-pip install -r requirements-dev.txt  # if you have additional dev requirements
-```
-
-### Troubleshooting
-
-If you encounter import errors:
-1. Make sure you've installed the package (`pip install .` or `pip install -e .`)
-2. Verify your Python environment is activated
-3. Check that all dependencies are installed
-4. If using from source directory, make sure you're in the correct directory
-
-Common issues:
-- ModuleNotFoundError: Make sure the package is installed
-- ImportError: Check that all dependencies are installed
-- PermissionError: Use appropriate permissions/sudo when needed
+Python 3.10+ required. Runs cross-platform; tested on Linux/Kali.
 
 ## Usage
 
-### As a Module
+```bash
+# List available techniques
+python __main__.py --list-techniques
 
-```python
-from payload_obfuscator.src.obfuscator import PayloadObfuscator
+# Obfuscate a binary (default output: <name>_obf.exe)
+python __main__.py path/to/input.exe
 
-# Initialize obfuscator
-obfuscator = PayloadObfuscator("input.exe", "output_dir")
-
-# Obfuscate the payload
-obfuscator.obfuscate()
+# Specify output, skip techniques, enable debug logging
+python __main__.py input.exe -o output.exe --skip junk_sections,entropy_reduce --verbose
 ```
 
-### From Command Line
+After `pip install -e .` the `payload-obfuscator` console script is also available.
+
+## Development
 
 ```bash
-python3 -m payload_obfuscator.src.obfuscator input.exe -o output_dir
+pip install -r requirements-dev.txt
+pytest                          # 47 tests
+python src/stubs/generate.py    # regenerate stub bytes (requires keystone-engine)
 ```
-
-## Advanced Usage Examples
-
-### String Encryption
-
-```python
-from payload_obfuscator.src.obfuscator import PayloadObfuscator
-
-obfuscator = PayloadObfuscator("input.exe", "output_dir")
-pe = obfuscator.pe_handler.load_pe("input.exe")
-
-# Encrypt strings using specific method
-obfuscator.string_handler.encrypt_strings(pe, method="aes")
-
-# Encrypt strings in specific sections
-obfuscator.string_handler.encrypt_strings(pe, method="xor", section_names=[".text", ".data"])
-
-# Get string table information
-info = obfuscator.string_handler.get_string_table_info(pe)
-```
-
-### Anti-Analysis Features
-
-```python
-# Check execution environment
-env_check = obfuscator.anti_analysis_handler.check_environment()
-
-# Apply evasion techniques
-obfuscator.anti_analysis_handler.apply_evasion_techniques(
-    skip_debugger=False,
-    skip_vm=False
-)
-
-# Get detailed environment info
-env_info = obfuscator.anti_analysis_handler.get_environment_info()
-```
-
-### Section Name Randomization
-
-```python
-# Randomize specific section
-section = pe.sections[0]
-obfuscator.section_handler.randomize_section_name(pe, section, strategy="random")
-
-# Randomize all non-critical sections
-obfuscator.section_handler.randomize_all_section_names(pe, skip_critical=True, strategy="mimic")
-```
-
-## Security Considerations
-
-1. This tool is for educational purposes only
-2. Use only in authorized lab environments
-3. Do not use on production systems
-4. Follow all applicable laws and regulations
-5. Practice responsible disclosure
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
 
 ## Disclaimer
 
-This tool is intended for educational purposes only, specifically for practicing techniques within authorized lab environments. The authors are not responsible for any misuse or damage caused by this tool.
-
-## Acknowledgments
-
-- PE format documentation
-- Python pefile library
+Educational use only. Intended for authorized lab targets and self-study related to OSEP (PEN-300) coursework. The author is not responsible for misuse.
