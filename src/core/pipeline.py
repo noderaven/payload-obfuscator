@@ -2,8 +2,6 @@
 from pathlib import Path
 from typing import Sequence
 from loguru import logger
-import pefile
-
 from src.core import pe_loader, validator
 from src.techniques.base import BaseTechnique, TechniqueError
 
