@@ -1,11 +1,6 @@
-#!/usr/bin/env python3
-
-"""
-Command-line entry point for the payload obfuscator.
-"""
-
+"""CLI shim -- delegates to src/__main__.py."""
 import sys
-from .src.obfuscator import main
+from src.__main__ import main
 
 if __name__ == "__main__":
-    sys.exit(main()) 
+    sys.exit(main())
