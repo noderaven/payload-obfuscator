@@ -20,3 +20,7 @@ def test_ror13_hash_known_values():
 def test_ror13_hash_different_for_different_names():
     assert ror13_hash("VirtualAlloc") != ror13_hash("CreateThread")
     assert ror13_hash("LoadLibraryA") != ror13_hash("LoadLibraryW")
+
+def test_ror13_hash_virtualalloc_pinned():
+    """Pin the ROR-13 hash for VirtualAlloc to catch algorithm regressions."""
+    assert ror13_hash("VirtualAlloc") == 0x302ebe1c
