@@ -55,3 +55,71 @@ def append_section_data(pe: pefile.PE, data: bytes) -> int:
     padded = bytes(data) + b"\x00" * (aligned_chunk - len(data))
     pe.__data__ = existing + bytearray(padded)
     return offset
+
+
+def fix_headers(pe: pefile.PE) -> None:
+    """Recompute NumberOfSections, SizeOfImage, SizeOfHeaders, and CheckSum.
+    Call this once after all techniques have run, before save()."""
+    sa = pe.OPTIONAL_HEADER.SectionAlignment
+    fa = pe.OPTIONAL_HEADER.FileAlignment
+
+    pe.FILE_HEADER.NumberOfSections = len(pe.sections)
+
+    max_va = max(s.VirtualAddress + s.Misc_VirtualSize for s in pe.sections)
+    pe.OPTIONAL_HEADER.SizeOfImage = pe_math.align(max_va, sa)
+
+    e_lfanew = pe.DOS_HEADER.e_lfanew
+    section_table_start = e_lfanew + 4 + pe.FILE_HEADER.sizeof() + pe.FILE_HEADER.SizeOfOptionalHeader
+    headers_raw_end = section_table_start + len(pe.sections) * 40
+    pe.OPTIONAL_HEADER.SizeOfHeaders = pe_math.align(headers_raw_end, fa)
+
+    pe.OPTIONAL_HEADER.CheckSum = pe.generate_checksum()
+
+
+def append_new_section(
+    pe: pefile.PE,
+    name: str,
+    data: bytes,
+    characteristics: int,
+) -> None:
+    """Add a new section. Raises PEError if no space in the section table header."""
+    fa = pe.OPTIONAL_HEADER.FileAlignment
+    sa = pe.OPTIONAL_HEADER.SectionAlignment
+
+    e_lfanew = pe.DOS_HEADER.e_lfanew
+    section_table_start = e_lfanew + 4 + pe.FILE_HEADER.sizeof() + pe.FILE_HEADER.SizeOfOptionalHeader
+    existing_headers_end = section_table_start + len(pe.sections) * 40
+
+    first_raw = min(
+        s.PointerToRawData for s in pe.sections if s.PointerToRawData > 0
+    )
+    available = first_raw - existing_headers_end
+    if available < 40:
+        raise PEError(
+            f"No header space for new section (need 40 bytes, have {available}). "
+            "Consider enlarging SizeOfHeaders or use section slack instead."
+        )
+
+    last = max(pe.sections, key=lambda s: s.VirtualAddress)
+    new_va = pe_math.align(last.VirtualAddress + last.Misc_VirtualSize, sa)
+
+    raw_offset = append_section_data(pe, data)
+    raw_size = pe_math.align(len(data), fa)
+
+    name_bytes = name.encode("ascii").ljust(8, b"\x00")[:8]
+    hdr = struct.pack(
+        "<8sIIIIIIHHI",
+        name_bytes,
+        len(data),       # Misc_VirtualSize
+        new_va,          # VirtualAddress
+        raw_size,        # SizeOfRawData
+        raw_offset,      # PointerToRawData
+        0, 0, 0, 0,      # Relocations, Linenumbers (unused)
+        characteristics,
+    )
+
+    safe_write(pe, existing_headers_end, hdr)
+    # Increment NumberOfSections in the in-memory struct so parse_sections
+    # reads all entries including the new one we just wrote.
+    pe.FILE_HEADER.NumberOfSections = len(pe.sections) + 1
+    pe.parse_sections(section_table_start)
