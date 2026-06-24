@@ -55,13 +55,15 @@ def test_full_pipeline_produces_valid_pe(minimal_pe_path, tmp_path):
     from src.techniques.string_encrypt import StringEncrypt
     from src.techniques.import_hash import ImportHash
 
+    from src.stubs.xor_decryptor_x64 import STUB_BYTES as _XOR_BYTES
+
     out = tmp_path / "out_obf.exe"
     pipeline = ObfuscationPipeline()
     pipeline.run(
         minimal_pe_path,
         out,
-        [HeaderNormalize(), SectionRename(), StringEncrypt(),
-         ImportHash(), EntropyReduce(), JunkSections()],
+        [HeaderNormalize(), StringEncrypt(), ImportHash(),
+         SectionRename(), EntropyReduce(), JunkSections()],
     )
     assert out.exists()
     pe2 = pefile.PE(str(out))
@@ -69,3 +71,6 @@ def test_full_pipeline_produces_valid_pe(minimal_pe_path, tmp_path):
     assert pe2.FILE_HEADER.NumberOfSections >= 2
     assert pe2.OPTIONAL_HEADER.SizeOfImage % pe2.OPTIONAL_HEADER.SectionAlignment == 0
     pe2.close()
+    if _XOR_BYTES:
+        raw = out.read_bytes()
+        assert b"TestString" not in raw, "StringEncrypt should have encrypted this string"

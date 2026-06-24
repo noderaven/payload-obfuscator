@@ -16,21 +16,22 @@ class ObfuscationPipeline:
         pe = pe_loader.load(input_path)
         validator.pre_validate(pe)
 
-        applied = []
-        for technique in techniques:
-            try:
-                technique.apply(pe)
-                logger.success(f"[{technique.name}] applied")
-                applied.append(technique.name)
-            except TechniqueError as exc:
-                if technique.required:
-                    pe.close()
-                    raise
-                logger.warning(f"[{technique.name}] skipped: {exc}")
+        try:
+            applied = []
+            for technique in techniques:
+                try:
+                    technique.apply(pe)
+                    logger.success(f"[{technique.name}] applied")
+                    applied.append(technique.name)
+                except TechniqueError as exc:
+                    if technique.required:
+                        raise
+                    logger.warning(f"[{technique.name}] skipped: {exc}")
 
-        pe_loader.fix_headers(pe)
-        validator.post_validate(pe)
-        pe_loader.save(pe, output_path)
-        pe.close()
-        logger.success(f"Saved to {output_path} (techniques: {', '.join(applied)})")
-        return True
+            pe_loader.fix_headers(pe)
+            validator.post_validate(pe)
+            pe_loader.save(pe, output_path)
+            logger.success(f"Saved to {output_path} (techniques: {', '.join(applied)})")
+            return True
+        finally:
+            pe.close()

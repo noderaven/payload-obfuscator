@@ -19,9 +19,9 @@ _CONSOLE = Console()
 
 _ALL_TECHNIQUES = [
     HeaderNormalize,
-    SectionRename,
     StringEncrypt,
     ImportHash,
+    SectionRename,
     EntropyReduce,
     JunkSections,
 ]
