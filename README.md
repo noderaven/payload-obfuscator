@@ -52,8 +52,6 @@ pytest                          # 47 tests
 python src/stubs/generate.py    # regenerate stub bytes (requires keystone-engine)
 ```
 
-Design notes and the implementation plan live under `docs/superpowers/`.
-
 ## Disclaimer
 
 Educational use only. Intended for authorized lab targets and self-study related to OSEP (PEN-300) coursework. The author is not responsible for misuse.

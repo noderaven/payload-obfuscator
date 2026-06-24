@@ -57,3 +57,6 @@ test_files/
 samples/
 temp/
 tmp/
+
+# Local design/planning notes (not tracked)
+docs/superpowers/
