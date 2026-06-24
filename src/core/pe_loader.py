@@ -90,9 +90,10 @@ def append_new_section(
     section_table_start = e_lfanew + 4 + pe.FILE_HEADER.sizeof() + pe.FILE_HEADER.SizeOfOptionalHeader
     existing_headers_end = section_table_start + len(pe.sections) * 40
 
-    first_raw = min(
-        s.PointerToRawData for s in pe.sections if s.PointerToRawData > 0
-    )
+    raw_offsets = [s.PointerToRawData for s in pe.sections if s.PointerToRawData > 0]
+    if not raw_offsets:
+        raise PEError("No sections with valid raw data offsets; cannot determine header space.")
+    first_raw = min(raw_offsets)
     available = first_raw - existing_headers_end
     if available < 40:
         raise PEError(

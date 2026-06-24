@@ -30,7 +30,7 @@ _DECOY_MAP: dict[str, str] = {
     "NtWriteVirtualMemory":    "NtQueryInformation",
     "LoadLibraryA":            "FreeLibrary\x00\x00\x00",
     "LoadLibraryW":            "FreeLibraryW\x00\x00",
-    "GetProcAddress":          "GetModuleHandleA",
+    "GetProcAddress":          "GetTickCount",
 }
 
 

@@ -74,8 +74,9 @@ class StringEncrypt(BaseTechnique):
             name = section.Name.rstrip(b"\x00").decode("ascii", errors="replace")
             if name not in (".rdata", ".data"):
                 continue
+            sec_size = min(section.Misc_VirtualSize, section.SizeOfRawData)
             sec_data = bytes(pe.__data__[section.PointerToRawData:
-                                         section.PointerToRawData + section.Misc_VirtualSize])
+                                         section.PointerToRawData + sec_size])
             for offset, length in _find_strings(sec_data, self._min_len):
                 abs_offset = section.PointerToRawData + offset
                 rva = section.VirtualAddress + offset
