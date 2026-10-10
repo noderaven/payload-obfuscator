@@ -23,8 +23,9 @@ Applied in this order via `ObfuscationPipeline`:
 git clone https://github.com/noderaven/payload-obfuscator.git
 cd payload-obfuscator
 python -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+pip install -e .
 ```
 
 Python 3.10+ required. Runs cross-platform; tested on Linux/Kali.
@@ -42,7 +43,7 @@ python __main__.py path/to/input.exe
 python __main__.py input.exe -o output.exe --skip junk_sections,entropy_reduce --verbose
 ```
 
-After `pip install -e .` the `payload-obfuscator` console script is also available.
+The `payload-obfuscator` console script (installed by `pip install -e .`) works the same way.
 
 ## Development
 
