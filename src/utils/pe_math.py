@@ -33,9 +33,18 @@ def offset_to_rva(pe: "pefile.PE", offset: int) -> int:
     raise ValueError(f"File offset 0x{offset:08x} does not fall within any section")
 
 
+def effective_virtual_size(section: "pefile.SectionStructure") -> int:
+    """Return the section's used size: VirtualSize, or SizeOfRawData when VirtualSize is 0.
+
+    The Windows loader maps SizeOfRawData bytes when VirtualSize is 0, so every
+    raw byte of such a section must be treated as in use.
+    """
+    return section.Misc_VirtualSize or section.SizeOfRawData
+
+
 def section_slack(section: "pefile.SectionStructure") -> int:
     """Return unused bytes at the end of a section's raw data."""
-    return max(0, section.SizeOfRawData - section.Misc_VirtualSize)
+    return max(0, section.SizeOfRawData - effective_virtual_size(section))
 
 
 def find_section_by_name(pe: "pefile.PE", name: str):
