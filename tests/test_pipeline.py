@@ -2,7 +2,9 @@
 import pytest
 import pefile
 from pathlib import Path
+from src.core.pe_loader import PEWriteError, safe_write
 from src.core.pipeline import ObfuscationPipeline
+from src.core.validator import ValidationError
 from src.techniques.base import BaseTechnique, TechniqueError
 
 
@@ -21,6 +23,20 @@ class _FailRequired(BaseTechnique):
     name = "fail-required"
     required = True
     def apply(self, pe): raise TechniqueError("intentional")
+
+
+class _WriteThenFail(BaseTechnique):
+    name = "write-then-fail"
+    required = False
+    def apply(self, pe):
+        safe_write(pe, pe.sections[0].PointerToRawData, b"\xCC" * 16)
+        raise TechniqueError("intentional after partial write")
+
+
+class _RaisePEWriteError(BaseTechnique):
+    name = "raise-pe-write-error"
+    required = False
+    def apply(self, pe): raise PEWriteError("boom")
 
 
 def test_pipeline_runs_noop_and_produces_valid_output(minimal_pe_path, tmp_path):
@@ -74,3 +90,40 @@ def test_full_pipeline_produces_valid_pe(minimal_pe_path, tmp_path):
     if _XOR_BYTES:
         raw = out.read_bytes()
         assert b"TestString" not in raw, "StringEncrypt should have encrypted this string"
+
+
+def test_pipeline_rolls_back_partial_edits(minimal_pe_path, tmp_path):
+    a = tmp_path / "a.exe"
+    b = tmp_path / "b.exe"
+    pipeline = ObfuscationPipeline()
+    assert pipeline.run(minimal_pe_path, a, [_NoopTechnique()])
+    assert pipeline.run(minimal_pe_path, b, [_WriteThenFail()])
+    assert a.read_bytes() == b.read_bytes()
+
+
+def test_pipeline_aborts_on_non_technique_error_without_output(minimal_pe_path, tmp_path):
+    out = tmp_path / "out.exe"
+    pipeline = ObfuscationPipeline()
+    with pytest.raises(PEWriteError):
+        pipeline.run(minimal_pe_path, out, [_RaisePEWriteError()])
+    assert not out.exists()
+
+
+def test_pipeline_closes_pe_when_pre_validate_fails(minimal_pe_path, tmp_path, monkeypatch):
+    def _fail(pe):
+        raise ValidationError("intentional")
+
+    calls = []
+    original_close = pefile.PE.close
+
+    def _record_close(self):
+        calls.append(self)
+        original_close(self)
+
+    monkeypatch.setattr("src.core.pipeline.validator.pre_validate", _fail)
+    monkeypatch.setattr(pefile.PE, "close", _record_close)
+    out = tmp_path / "out.exe"
+    with pytest.raises(ValidationError):
+        ObfuscationPipeline().run(minimal_pe_path, out, [_NoopTechnique()])
+    assert len(calls) == 1
+    assert not out.exists()
