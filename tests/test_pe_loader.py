@@ -1,4 +1,5 @@
 # tests/test_pe_loader.py
+import struct
 import pytest
 import pefile
 from pathlib import Path
@@ -43,6 +44,26 @@ def test_safe_write_raises_on_oob(minimal_pe_path):
     pe = load(minimal_pe_path)
     with pytest.raises(PEWriteError):
         safe_write(pe, len(pe.__data__) - 2, b"\x00" * 10)
+    pe.close()
+
+
+def test_safe_write_survives_pe_write(minimal_pe_path):
+    pe = load(minimal_pe_path)
+    safe_write(pe, pe.sections[0].get_file_offset(), b".zzz\x00\x00\x00\x00")
+    assert pe.sections[0].Name == b".zzz\x00\x00\x00\x00"
+    out = pefile.PE(data=pe.write())
+    assert out.sections[0].Name.rstrip(b"\x00") == b".zzz"
+    out.close()
+    pe.close()
+
+
+def test_safe_write_partial_structure_overlap(minimal_pe_path):
+    pe = load(minimal_pe_path)
+    safe_write(pe, pe.FILE_HEADER.get_file_offset() + 4, struct.pack("<I", 0xCAFEBABE))
+    assert pe.FILE_HEADER.TimeDateStamp == 0xCAFEBABE
+    out = pefile.PE(data=pe.write())
+    assert out.FILE_HEADER.TimeDateStamp == 0xCAFEBABE
+    out.close()
     pe.close()
 
 

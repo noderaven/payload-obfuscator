@@ -28,13 +28,33 @@ def save(pe: pefile.PE, path: Path) -> None:
 
 
 def safe_write(pe: pefile.PE, offset: int, data: bytes) -> None:
-    """Write data into pe.__data__ at offset. Raises PEWriteError if out of bounds."""
+    """Write data into pe.__data__ at offset. Raises PEWriteError if out of bounds.
+
+    Every parsed structure that overlaps the written range is then re-read from
+    pe.__data__, so the write survives pe.write() (which repacks every entry of
+    pe.__structures__) and attributes such as section.Name reflect it.
+    """
     end = offset + len(data)
     if offset < 0 or end > len(pe.__data__):
         raise PEWriteError(
             f"Write [0x{offset:x}..0x{end:x}) exceeds PE size 0x{len(pe.__data__):x}"
         )
-    pe.set_bytes_at_offset(offset, data)
+    if not data:
+        return
+    pe.set_bytes_at_offset(offset, bytes(data))
+    _resync_structures(pe, offset, end)
+
+
+def _resync_structures(pe: pefile.PE, start: int, end: int) -> None:
+    """Re-unpack every structure in pe.__structures__ that overlaps [start, end)."""
+    data_len = len(pe.__data__)
+    for structure in pe.__structures__:
+        s_off = structure.get_file_offset()
+        if s_off is None:
+            continue
+        s_end = s_off + structure.sizeof()
+        if s_off < end and start < s_end and s_end <= data_len:
+            structure.__unpack__(bytes(pe.__data__[s_off:s_end]))
 
 
 def append_section_data(pe: pefile.PE, data: bytes) -> int:
