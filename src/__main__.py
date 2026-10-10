@@ -41,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("input", type=Path, nargs="?", help="Input PE64 file")
     parser.add_argument(
         "-o", "--output", type=Path, default=None,
-        help="Output path (default: <input>_obf.exe)",
+        help="Output path (default: <input stem>_obf<input suffix> next to the input)",
     )
     parser.add_argument(
         "--skip", type=str, default="",
@@ -71,8 +71,12 @@ def main(argv: list[str] | None = None) -> int:
 
     output = args.output or args.input.with_name(args.input.stem + "_obf" + args.input.suffix)
 
-    skip = {s.strip().lower() for s in args.skip.split(",") if s.strip()}
-    techniques = [cls() for cls in _ALL_TECHNIQUES if cls().name not in skip]
+    skip_tokens = [s.strip().lower() for s in args.skip.split(",") if s.strip()]
+    misses = [tok for tok in skip_tokens if tok not in _TECHNIQUE_MAP]
+    if misses:
+        parser.error(f"unknown technique(s) in --skip: {', '.join(sorted(misses))}")
+    skipped_classes = {_TECHNIQUE_MAP[tok] for tok in skip_tokens}
+    techniques = [cls() for cls in _ALL_TECHNIQUES if cls not in skipped_classes]
 
     if args.verbose:
         logger.remove()
