@@ -61,3 +61,31 @@ def test_string_encrypt_skips_pe_without_suitable_slack(tmp_path):
     pe = load(path)
     StringEncrypt(min_string_length=8).apply(pe)
     pe.close()
+
+
+def test_string_encrypt_keeps_imports_loadable(full_pe_path):
+    """Import, export and debug strings are loader data and must stay plaintext."""
+    pe = load(full_pe_path)
+    before = [(d.dll, [i.name for i in d.imports]) for d in pe.DIRECTORY_ENTRY_IMPORT]
+    StringEncrypt().apply(pe)
+    fix_headers(pe)
+    out = write_and_reload(pe)
+    after = [(d.dll, [i.name for i in d.imports]) for d in out.DIRECTORY_ENTRY_IMPORT]
+    assert after == before
+    assert [e.name for e in out.DIRECTORY_ENTRY_EXPORT.symbols] == [b"ExportedFunction"]
+    assert b"AnotherLongString" not in out.__data__
+    out.close()
+    pe.close()
+
+
+def test_string_straddling_protected_range_is_skipped():
+    """A printable run that runs into the import descriptor is left alone whole."""
+    data = make_minimal_pe64(rdata_data=b"UserPrefixAAAAAA",
+                             imports={"KERNEL32.dll": ["VirtualAlloc"]})
+    pe = pefile.PE(data=data)
+    StringEncrypt().apply(pe)
+    assert b"UserPrefixAAAAAA" in bytes(pe.__data__)
+    out = write_and_reload(pe)
+    assert out.DIRECTORY_ENTRY_IMPORT[0].imports[0].name == b"VirtualAlloc"
+    out.close()
+    pe.close()
