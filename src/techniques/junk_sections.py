@@ -13,7 +13,11 @@ class JunkSections(BaseTechnique):
     name = "junk_sections"
 
     def apply(self, pe: pefile.PE) -> None:
-        decoy_name = random.choice(_DECOY_NAMES)
+        existing = {s.Name.rstrip(b"\x00").decode("ascii", errors="replace") for s in pe.sections}
+        unused = [n for n in _DECOY_NAMES if n not in existing]
+        if not unused:
+            raise TechniqueError("No unused decoy section name")
+        decoy_name = random.choice(unused)
         phrase = b"Microsoft Corporation\x00" * 50
         size = random.randint(512, 2048)
         data = (phrase * (size // len(phrase) + 1))[:size]
