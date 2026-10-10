@@ -109,6 +109,72 @@ def test_pipeline_aborts_on_non_technique_error_without_output(minimal_pe_path, 
     assert not out.exists()
 
 
+def test_full_pipeline_on_full_fixture(full_pe_path, tmp_path):
+    """End-to-end: run all six techniques on full_pe_path; verify every preserved attribute."""
+    from src.techniques.header_normalize import HeaderNormalize
+    from src.techniques.section_rename import SectionRename
+    from src.techniques.entropy_reduce import EntropyReduce
+    from src.techniques.junk_sections import JunkSections
+    from src.techniques.string_encrypt import StringEncrypt
+    from src.techniques.import_hash import ImportHash, _DECOY_MAP
+
+    out_path = tmp_path / "out_full.exe"
+    pipeline = ObfuscationPipeline()
+    pipeline.run(
+        full_pe_path,
+        out_path,
+        [HeaderNormalize(), StringEncrypt(), ImportHash(),
+         SectionRename(), EntropyReduce(), JunkSections()],
+    )
+
+    out = pefile.PE(str(out_path))
+    try:
+        # Imports: single DLL, three entries; decoys replace high-risk names.
+        assert hasattr(out, "DIRECTORY_ENTRY_IMPORT"), "output has no import directory"
+        assert len(out.DIRECTORY_ENTRY_IMPORT) == 1
+        assert out.DIRECTORY_ENTRY_IMPORT[0].dll == b"KERNEL32.dll"
+        import_names = [
+            imp.name
+            for imp in out.DIRECTORY_ENTRY_IMPORT[0].imports
+            if imp.name is not None
+        ]
+        assert len(import_names) == 3
+        assert b"ExitProcess" in import_names
+        decoy_virtualalloc = _DECOY_MAP["VirtualAlloc"].rstrip("\x00").encode("ascii")
+        decoy_getprocaddress = _DECOY_MAP["GetProcAddress"].rstrip("\x00").encode("ascii")
+        assert decoy_virtualalloc in import_names
+        assert decoy_getprocaddress in import_names
+
+        # Exports: ExportedFunction still present.
+        assert hasattr(out, "DIRECTORY_ENTRY_EXPORT")
+        export_names = [
+            exp.name
+            for exp in out.DIRECTORY_ENTRY_EXPORT.symbols
+            if exp.name is not None
+        ]
+        assert b"ExportedFunction" in export_names
+
+        # Section names are unique.
+        section_names = [s.Name.rstrip(b"\x00") for s in out.sections]
+        assert len(section_names) == len(set(section_names))
+
+        # Entry-point byte intact.
+        ep = out.OPTIONAL_HEADER.AddressOfEntryPoint
+        assert out.get_data(ep, 1) == b"\xC3"
+
+        # Checksum matches.
+        assert out.verify_checksum()
+
+        # Rich header was stripped.
+        assert out.parse_rich_header() is None
+
+        # Overlay preserved.
+        overlay = out.get_overlay()
+        assert overlay is not None and overlay.startswith(b"OVERLAY!" * 8)
+    finally:
+        out.close()
+
+
 def test_pipeline_closes_pe_when_pre_validate_fails(minimal_pe_path, tmp_path, monkeypatch):
     def _fail(pe):
         raise ValidationError("intentional")
