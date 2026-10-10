@@ -1,4 +1,5 @@
 # tests/test_validator.py
+import struct
 import pytest
 import pefile
 from src.core.validator import pre_validate, post_validate, ValidationError
@@ -21,6 +22,18 @@ def test_pre_validate_rejects_wrong_magic(tmp_path):
     bad.write_bytes(data)
     pe = load(bad)
     with pytest.raises(ValidationError, match="PE32\\+"):
+        pre_validate(pe)
+    pe.close()
+
+
+def test_pre_validate_rejects_arm64(tmp_path):
+    data = bytearray(make_minimal_pe64())
+    # Machine field is at e_lfanew(0x40) + 4(PE sig) = 0x44
+    data[0x44:0x46] = struct.pack("<H", 0xAA64)
+    bad = tmp_path / "arm64.exe"
+    bad.write_bytes(data)
+    pe = load(bad)
+    with pytest.raises(ValidationError, match="AMD64"):
         pre_validate(pe)
     pe.close()
 
