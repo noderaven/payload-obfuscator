@@ -51,3 +51,32 @@ def test_section_rename_names_written_to_pe_data(minimal_pe_path):
         name = section.Name.rstrip(b"\x00").decode("ascii", errors="replace")
         assert name in MSVC_SECTION_NAMES
     pe2.close()
+
+
+def _section_names(pe):
+    return [s.Name.rstrip(b"\x00").decode("ascii", errors="replace") for s in pe.sections]
+
+
+def test_rename_never_assigns_critical_names():
+    raw = make_minimal_pe64()
+    for _ in range(50):
+        pe = pefile.PE(data=raw)
+        SectionRename().apply(pe)
+        for name in _section_names(pe):
+            assert name not in CRITICAL_SECTION_NAMES, f"Assigned critical name {name!r}"
+        pe.close()
+
+
+def test_rename_names_unique_with_many_sections():
+    extra = [(n, b"z") for n in [".data", ".pdata", ".rsrc", ".reloc", ".gfids", ".00cfg", ".foo"]]
+    raw = make_minimal_pe64(extra_sections=extra)
+    before = _section_names(pefile.PE(data=raw))
+    for _ in range(50):
+        pe = pefile.PE(data=raw)
+        SectionRename().apply(pe)
+        names = _section_names(pe)
+        assert len(names) == len(set(names)), f"Duplicate section names: {names}"
+        for critical in (".rsrc", ".reloc"):
+            assert names.count(critical) == 1
+            assert names.index(critical) == before.index(critical)
+        pe.close()

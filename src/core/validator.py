@@ -11,6 +11,9 @@ def pre_validate(pe: pefile.PE) -> None:
     """Raise ValidationError if pe is not a usable PE64."""
     if pe.OPTIONAL_HEADER.Magic != 0x20B:
         raise ValidationError(f"Not a PE32+ (x64) binary; Magic=0x{pe.OPTIONAL_HEADER.Magic:x}")
+    m = pe.FILE_HEADER.Machine
+    if m != 0x8664:
+        raise ValidationError(f"Not an x64 (AMD64) binary; Machine=0x{m:x}")
     if not pe.sections:
         raise ValidationError("PE has no sections")
     if pe.OPTIONAL_HEADER.SectionAlignment == 0:

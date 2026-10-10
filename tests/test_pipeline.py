@@ -1,8 +1,11 @@
 # tests/test_pipeline.py
+import struct
 import pytest
 import pefile
 from pathlib import Path
+from src.core.pe_loader import PEWriteError, safe_write
 from src.core.pipeline import ObfuscationPipeline
+from src.core.validator import ValidationError
 from src.techniques.base import BaseTechnique, TechniqueError
 
 
@@ -21,6 +24,20 @@ class _FailRequired(BaseTechnique):
     name = "fail-required"
     required = True
     def apply(self, pe): raise TechniqueError("intentional")
+
+
+class _WriteThenFail(BaseTechnique):
+    name = "write-then-fail"
+    required = False
+    def apply(self, pe):
+        safe_write(pe, pe.sections[0].PointerToRawData, b"\xCC" * 16)
+        raise TechniqueError("intentional after partial write")
+
+
+class _RaisePEWriteError(BaseTechnique):
+    name = "raise-pe-write-error"
+    required = False
+    def apply(self, pe): raise PEWriteError("boom")
 
 
 def test_pipeline_runs_noop_and_produces_valid_output(minimal_pe_path, tmp_path):
@@ -74,3 +91,115 @@ def test_full_pipeline_produces_valid_pe(minimal_pe_path, tmp_path):
     if _XOR_BYTES:
         raw = out.read_bytes()
         assert b"TestString" not in raw, "StringEncrypt should have encrypted this string"
+
+
+def test_pipeline_rolls_back_partial_edits(minimal_pe_path, tmp_path):
+    a = tmp_path / "a.exe"
+    b = tmp_path / "b.exe"
+    pipeline = ObfuscationPipeline()
+    assert pipeline.run(minimal_pe_path, a, [_NoopTechnique()])
+    assert pipeline.run(minimal_pe_path, b, [_WriteThenFail()])
+    assert a.read_bytes() == b.read_bytes()
+
+
+def test_pipeline_aborts_on_non_technique_error_without_output(minimal_pe_path, tmp_path):
+    out = tmp_path / "out.exe"
+    pipeline = ObfuscationPipeline()
+    with pytest.raises(PEWriteError):
+        pipeline.run(minimal_pe_path, out, [_RaisePEWriteError()])
+    assert not out.exists()
+
+
+def test_full_pipeline_on_full_fixture(full_pe_path, tmp_path):
+    """End-to-end: run all six techniques on full_pe_path; verify every preserved attribute."""
+    from src.__main__ import _ALL_TECHNIQUES
+    from src.techniques.import_hash import _DECOY_MAP
+
+    out_path = tmp_path / "out_full.exe"
+    pipeline = ObfuscationPipeline()
+    result = pipeline.run(full_pe_path, out_path, [cls() for cls in _ALL_TECHNIQUES])
+    assert result is True
+
+    out = pefile.PE(str(out_path))
+    try:
+        # Imports: single DLL, three entries; each high-risk name is replaced by
+        # its own decoy. The fixture order is VirtualAlloc, GetProcAddress, ExitProcess.
+        assert hasattr(out, "DIRECTORY_ENTRY_IMPORT"), "output has no import directory"
+        assert len(out.DIRECTORY_ENTRY_IMPORT) == 1
+        assert out.DIRECTORY_ENTRY_IMPORT[0].dll == b"KERNEL32.dll"
+        imports = out.DIRECTORY_ENTRY_IMPORT[0].imports
+        assert len(imports) == 3
+        import_names = [imp.name for imp in imports]
+        expected = [
+            _DECOY_MAP["VirtualAlloc"].rstrip("\x00").encode("ascii"),
+            _DECOY_MAP["GetProcAddress"].rstrip("\x00").encode("ascii"),
+            b"ExitProcess",
+        ]
+        assert import_names == expected
+        assert b"VirtualAlloc" not in import_names
+        assert b"GetProcAddress" not in import_names
+
+        # Exports: ExportedFunction still present.
+        assert hasattr(out, "DIRECTORY_ENTRY_EXPORT")
+        export_names = [
+            exp.name
+            for exp in out.DIRECTORY_ENTRY_EXPORT.symbols
+            if exp.name is not None
+        ]
+        assert b"ExportedFunction" in export_names
+
+        # Section names are unique.
+        section_names = [s.Name.rstrip(b"\x00") for s in out.sections]
+        assert len(section_names) == len(set(section_names))
+
+        # Entry-point byte intact.
+        ep = out.OPTIONAL_HEADER.AddressOfEntryPoint
+        assert out.get_data(ep, 1) == b"\xC3"
+
+        # Checksum matches.
+        assert out.verify_checksum()
+
+        # Rich header was stripped.
+        assert out.parse_rich_header() is None
+
+        # Overlay preserved.
+        overlay = out.get_overlay()
+        assert overlay is not None and b"OVERLAY!" * 8 in overlay
+
+        # string_encrypt ran: the plaintext string must be absent from the file.
+        raw_out = out_path.read_bytes()
+        assert b"AnotherLongString" not in raw_out
+
+        # junk_sections ran: at least one section name must be a decoy name.
+        from src.techniques.junk_sections import _DECOY_NAMES
+        section_names = [s.Name.rstrip(b"\x00").decode("ascii", errors="replace")
+                         for s in out.sections]
+        assert any(n in _DECOY_NAMES for n in section_names)
+
+        # Authenticode blob survives; DATA_DIRECTORY[4] must still point to
+        # a valid WIN_CERTIFICATE header (fixture cert: 40 bytes, rev 0x0200, type 2).
+        dir4 = out.OPTIONAL_HEADER.DATA_DIRECTORY[4]
+        assert dir4.Size == 8 + 32
+        assert struct.unpack_from("<IHH", out.__data__, dir4.VirtualAddress) == (40, 0x0200, 2)
+    finally:
+        out.close()
+
+
+def test_pipeline_closes_pe_when_pre_validate_fails(minimal_pe_path, tmp_path, monkeypatch):
+    def _fail(pe):
+        raise ValidationError("intentional")
+
+    calls = []
+    original_close = pefile.PE.close
+
+    def _record_close(self):
+        calls.append(self)
+        original_close(self)
+
+    monkeypatch.setattr("src.core.pipeline.validator.pre_validate", _fail)
+    monkeypatch.setattr(pefile.PE, "close", _record_close)
+    out = tmp_path / "out.exe"
+    with pytest.raises(ValidationError):
+        ObfuscationPipeline().run(minimal_pe_path, out, [_NoopTechnique()])
+    assert len(calls) == 1
+    assert not out.exists()
