@@ -15,6 +15,7 @@ import pefile
 
 from src.techniques.base import BaseTechnique, TechniqueError
 from src.core.pe_loader import safe_write, append_new_section
+from src.core.pe_ranges import protected_file_ranges, overlaps
 from src.utils import pe_math, constants
 from src.stubs.xor_decryptor_x64 import STUB_BYTES, ENTRY_SIZE
 
@@ -69,6 +70,7 @@ class StringEncrypt(BaseTechnique):
             )
 
         entries: list[tuple[int, int, int]] = []
+        protected = protected_file_ranges(pe)
 
         for section in pe.sections:
             name = section.Name.rstrip(b"\x00").decode("ascii", errors="replace")
@@ -79,6 +81,8 @@ class StringEncrypt(BaseTechnique):
                                          section.PointerToRawData + sec_size])
             for offset, length in _find_strings(sec_data, self._min_len):
                 abs_offset = section.PointerToRawData + offset
+                if overlaps(protected, abs_offset, abs_offset + length):
+                    continue  # loader data (imports, exports, debug): leave intact
                 rva = section.VirtualAddress + offset
                 key = int.from_bytes(os.urandom(1), "little") or 0x41
                 encrypted = bytes(sec_data[offset + i] ^ key for i in range(length))
