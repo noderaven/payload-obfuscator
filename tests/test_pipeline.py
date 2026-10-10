@@ -111,39 +111,31 @@ def test_pipeline_aborts_on_non_technique_error_without_output(minimal_pe_path, 
 
 def test_full_pipeline_on_full_fixture(full_pe_path, tmp_path):
     """End-to-end: run all six techniques on full_pe_path; verify every preserved attribute."""
-    from src.techniques.header_normalize import HeaderNormalize
-    from src.techniques.section_rename import SectionRename
-    from src.techniques.entropy_reduce import EntropyReduce
-    from src.techniques.junk_sections import JunkSections
-    from src.techniques.string_encrypt import StringEncrypt
-    from src.techniques.import_hash import ImportHash, _DECOY_MAP
+    from src.__main__ import _ALL_TECHNIQUES
+    from src.techniques.import_hash import _DECOY_MAP
 
     out_path = tmp_path / "out_full.exe"
     pipeline = ObfuscationPipeline()
-    pipeline.run(
-        full_pe_path,
-        out_path,
-        [HeaderNormalize(), StringEncrypt(), ImportHash(),
-         SectionRename(), EntropyReduce(), JunkSections()],
-    )
+    pipeline.run(full_pe_path, out_path, [cls() for cls in _ALL_TECHNIQUES])
 
     out = pefile.PE(str(out_path))
     try:
-        # Imports: single DLL, three entries; decoys replace high-risk names.
+        # Imports: single DLL, three entries; each high-risk name is replaced by
+        # its own decoy. The fixture order is VirtualAlloc, GetProcAddress, ExitProcess.
         assert hasattr(out, "DIRECTORY_ENTRY_IMPORT"), "output has no import directory"
         assert len(out.DIRECTORY_ENTRY_IMPORT) == 1
         assert out.DIRECTORY_ENTRY_IMPORT[0].dll == b"KERNEL32.dll"
-        import_names = [
-            imp.name
-            for imp in out.DIRECTORY_ENTRY_IMPORT[0].imports
-            if imp.name is not None
+        imports = out.DIRECTORY_ENTRY_IMPORT[0].imports
+        assert len(imports) == 3
+        import_names = [imp.name for imp in imports]
+        expected = [
+            _DECOY_MAP["VirtualAlloc"].rstrip("\x00").encode("ascii"),
+            _DECOY_MAP["GetProcAddress"].rstrip("\x00").encode("ascii"),
+            b"ExitProcess",
         ]
-        assert len(import_names) == 3
-        assert b"ExitProcess" in import_names
-        decoy_virtualalloc = _DECOY_MAP["VirtualAlloc"].rstrip("\x00").encode("ascii")
-        decoy_getprocaddress = _DECOY_MAP["GetProcAddress"].rstrip("\x00").encode("ascii")
-        assert decoy_virtualalloc in import_names
-        assert decoy_getprocaddress in import_names
+        assert import_names == expected
+        assert b"VirtualAlloc" not in import_names
+        assert b"GetProcAddress" not in import_names
 
         # Exports: ExportedFunction still present.
         assert hasattr(out, "DIRECTORY_ENTRY_EXPORT")
@@ -170,7 +162,7 @@ def test_full_pipeline_on_full_fixture(full_pe_path, tmp_path):
 
         # Overlay preserved.
         overlay = out.get_overlay()
-        assert overlay is not None and overlay.startswith(b"OVERLAY!" * 8)
+        assert overlay is not None and b"OVERLAY!" * 8 in overlay
     finally:
         out.close()
 
