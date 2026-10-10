@@ -19,11 +19,23 @@ def captured(monkeypatch):
     return runs
 
 
-def test_skip_unknown_name_errors(minimal_pe_path, capsys):
+def test_skip_unknown_name_errors(minimal_pe_path, captured, capsys):
     with pytest.raises(SystemExit) as exc_info:
         main([str(minimal_pe_path), "--skip", "bogus"])
     assert exc_info.value.code == 2
     assert "bogus" in capsys.readouterr().err
+    assert captured == []  # pipeline must not have run
+
+
+def test_skip_mixed_unknown_errors_sorted(minimal_pe_path, captured, capsys):
+    """A mix of valid and unknown tokens is rejected; unknown names are sorted."""
+    with pytest.raises(SystemExit) as exc_info:
+        main([str(minimal_pe_path), "--skip", "section_rename,zzz,aaa"])
+    assert exc_info.value.code == 2
+    err = capsys.readouterr().err
+    assert "aaa" in err and "zzz" in err
+    assert err.index("aaa") < err.index("zzz")
+    assert captured == []  # pipeline must not have run
 
 
 def test_skip_accepts_both_name_forms(minimal_pe_path, captured):

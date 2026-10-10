@@ -27,7 +27,20 @@ def test_full_fixture_parses_every_feature(full_pe_path):
     assert dbg.entry.PdbFileName.rstrip(b"\x00") == rb"C:\build\secret\project.pdb"
     assert pe.parse_rich_header() is not None
     assert pe.DOS_HEADER.e_lfanew == 0x100
-    assert pe.OPTIONAL_HEADER.DATA_DIRECTORY[11].VirtualAddress != 0
+    dir11 = pe.OPTIONAL_HEADER.DATA_DIRECTORY[11]
+    assert dir11.VirtualAddress != 0
+    # Bound-import directory must cover both descriptors (8+8) and the name (13 bytes).
+    assert dir11.Size == 29
+    # Import descriptor must sit directly after the 29-byte rdata_data (aligned to 8).
+    _rdata_data_len = len(b"TestString\x00" + b"AnotherLongString\x00")  # 29
+    _rdata_base = 0x2000
+    _expected_idata_va = _rdata_base + ((_rdata_data_len + 7) & ~7)
+    assert pe.OPTIONAL_HEADER.DATA_DIRECTORY[1].VirtualAddress == _expected_idata_va
+    # .rdata Misc_VirtualSize must cover the full extent of the RSDS record.
+    rdata_sec = next(s for s in pe.sections if s.Name.rstrip(b"\x00") == b".rdata")
+    dbg = pe.DIRECTORY_ENTRY_DEBUG[0]
+    rsds_end_rva = dbg.struct.AddressOfRawData + dbg.struct.SizeOfData - _rdata_base
+    assert rdata_sec.Misc_VirtualSize >= rsds_end_rva
     sec = pe.OPTIONAL_HEADER.DATA_DIRECTORY[4]
     assert sec.Size == 8 + 32
     assert struct.unpack_from("<IHH", pe.__data__, sec.VirtualAddress) == (40, 0x0200, 2)

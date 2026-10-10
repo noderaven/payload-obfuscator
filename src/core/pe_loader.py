@@ -46,7 +46,14 @@ def safe_write(pe: pefile.PE, offset: int, data: bytes) -> None:
 
 
 def _resync_structures(pe: pefile.PE, start: int, end: int) -> None:
-    """Re-unpack every structure in pe.__structures__ that overlaps [start, end)."""
+    """Re-unpack every structure in pe.__structures__ that overlaps [start, end).
+
+    UnwindInfo is handled specially: its __unpack__ only refreshes the 4-byte fixed
+    header, while __pack__ rebuilds from self.UnwindCodes (populated only by
+    unpack_in_stages). Using __unpack__ alone would cause pe.write() to revert any
+    bytes written into the unwind-codes area. Two-stage call mirrors pefile's own
+    parser (see pefile.py parse_exception_directory).
+    """
     data_len = len(pe.__data__)
     for structure in pe.__structures__:
         s_off = structure.get_file_offset()
@@ -54,7 +61,18 @@ def _resync_structures(pe: pefile.PE, start: int, end: int) -> None:
             continue
         s_end = s_off + structure.sizeof()
         if s_off < end and start < s_end and s_end <= data_len:
-            structure.__unpack__(bytes(pe.__data__[s_off:s_end]))
+            if isinstance(structure, pefile.UnwindInfo):
+                # Reset so both stages of unpack_in_stages will execute.
+                structure._finished_unpacking = False
+                # Stage 1: parse the fixed 4-byte header; sizeof() is updated to
+                # reflect the real CountOfCodes and optional handler field.
+                structure.unpack_in_stages(bytes(pe.__data__[s_off:s_end]))
+                # Stage 2: parse the full structure now that sizeof() is correct.
+                full_end = s_off + structure.sizeof()
+                if full_end <= data_len:
+                    structure.unpack_in_stages(bytes(pe.__data__[s_off:full_end]))
+            else:
+                structure.__unpack__(bytes(pe.__data__[s_off:s_end]))
 
 
 IMAGE_DIRECTORY_ENTRY_SECURITY = 4
@@ -114,6 +132,16 @@ def append_section_data(pe: pefile.PE, data: bytes) -> int:
     if security is not None and security.VirtualAddress and security.VirtualAddress >= raw_end:
         _set_data_directory(pe, IMAGE_DIRECTORY_ENTRY_SECURITY,
                             security.VirtualAddress + shift, security.Size)
+
+    # PointerToSymbolTable is a file offset; shift it if it points into the moved tail.
+    # This matters for unstripped MinGW/GCC PE64 binaries whose COFF symbol table
+    # sits in the overlay.
+    pts = pe.FILE_HEADER.PointerToSymbolTable
+    if tail and shift and pts >= raw_end:
+        new_pts = pts + shift
+        pe.FILE_HEADER.PointerToSymbolTable = new_pts
+        safe_write(pe, pe.FILE_HEADER.get_file_offset() + 8, struct.pack("<I", new_pts))
+
     return offset
 
 

@@ -1,4 +1,5 @@
 # tests/test_pipeline.py
+import struct
 import pytest
 import pefile
 from pathlib import Path
@@ -116,7 +117,8 @@ def test_full_pipeline_on_full_fixture(full_pe_path, tmp_path):
 
     out_path = tmp_path / "out_full.exe"
     pipeline = ObfuscationPipeline()
-    pipeline.run(full_pe_path, out_path, [cls() for cls in _ALL_TECHNIQUES])
+    result = pipeline.run(full_pe_path, out_path, [cls() for cls in _ALL_TECHNIQUES])
+    assert result is True
 
     out = pefile.PE(str(out_path))
     try:
@@ -163,6 +165,22 @@ def test_full_pipeline_on_full_fixture(full_pe_path, tmp_path):
         # Overlay preserved.
         overlay = out.get_overlay()
         assert overlay is not None and b"OVERLAY!" * 8 in overlay
+
+        # string_encrypt ran: the plaintext string must be absent from the file.
+        raw_out = out_path.read_bytes()
+        assert b"AnotherLongString" not in raw_out
+
+        # junk_sections ran: at least one section name must be a decoy name.
+        from src.techniques.junk_sections import _DECOY_NAMES
+        section_names = [s.Name.rstrip(b"\x00").decode("ascii", errors="replace")
+                         for s in out.sections]
+        assert any(n in _DECOY_NAMES for n in section_names)
+
+        # Authenticode blob survives; DATA_DIRECTORY[4] must still point to
+        # a valid WIN_CERTIFICATE header (fixture cert: 40 bytes, rev 0x0200, type 2).
+        dir4 = out.OPTIONAL_HEADER.DATA_DIRECTORY[4]
+        assert dir4.Size == 8 + 32
+        assert struct.unpack_from("<IHH", out.__data__, dir4.VirtualAddress) == (40, 0x0200, 2)
     finally:
         out.close()
 

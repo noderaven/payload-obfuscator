@@ -39,7 +39,8 @@ class EntropyReduce(BaseTechnique):
             max_freq = max(freq)
             fill_byte = next(b for b in range(256) if freq[b] == max_freq)
             # Candidate raw data with the fill byte covering the slack
-            new_raw = old_raw[:used] + bytes([fill_byte] * slack_len)
+            fill = bytes([fill_byte]) * slack_len
+            new_raw = old_raw[:used] + fill
             # Only write if entropy strictly decreases
             if shannon_entropy(new_raw) < shannon_entropy(old_raw):
-                safe_write(pe, slack_start, bytes([fill_byte] * slack_len))
+                safe_write(pe, slack_start, fill)

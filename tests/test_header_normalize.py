@@ -100,3 +100,39 @@ def test_header_normalize_output_parses(minimal_pe_path):
     out = write_and_reload(pe)
     assert out.OPTIONAL_HEADER.Magic == 0x20B
     out.close()
+
+
+def test_resource_directory_timestamp_zeroed():
+    """DIRECTORY_ENTRY_RESOURCE.struct.TimeDateStamp is zeroed and survives pe.write()."""
+    import struct as _struct
+    # Build a 16-byte empty IMAGE_RESOURCE_DIRECTORY (no entries) with a known
+    # non-zero TimeDateStamp. Place it at the start of .rdata raw data.
+    # Structure: Characteristics(4) | TimeDateStamp(4) | MajorVersion(2) |
+    #            MinorVersion(2) | NumberOfNamedEntries(2) | NumberOfIdEntries(2)
+    RESOURCE_TS = 0xCAFEBABE
+    res_dir_bytes = _struct.pack("<IIHHHH", 0, RESOURCE_TS, 0, 0, 0, 0)
+
+    data = bytearray(make_minimal_pe64())
+    # Default fixture: .rdata raw at 0x400, VA at 0x2000.
+    rdata_raw_off = 0x400
+    rdata_va = 0x2000
+    data[rdata_raw_off:rdata_raw_off + len(res_dir_bytes)] = res_dir_bytes
+    # DATA_DIRECTORY[2] (resource): pe_off=0x40, data_dirs at pe_off+136=0xC8,
+    # dir[2] at 0xC8 + 2*8 = 0xD8.
+    _struct.pack_into("<II", data, 0xD8, rdata_va, len(res_dir_bytes))
+
+    pe = _load_bytes(bytes(data))
+    assert hasattr(pe, "DIRECTORY_ENTRY_RESOURCE"), "fixture must have a resource directory"
+    assert pe.DIRECTORY_ENTRY_RESOURCE.struct.TimeDateStamp == RESOURCE_TS
+
+    HeaderNormalize().apply(pe)
+
+    # Struct attribute must be cleared.
+    assert pe.DIRECTORY_ENTRY_RESOURCE.struct.TimeDateStamp == 0
+    # pe.write() must keep the cleared value (i.e., the struct must be resynced).
+    out_data = bytes(pe.write())
+    assert _struct.unpack_from("<I", out_data, rdata_raw_off + 4)[0] == 0
+    out = pefile.PE(data=out_data)
+    assert out.DIRECTORY_ENTRY_RESOURCE.struct.TimeDateStamp == 0
+    out.close()
+    pe.close()
